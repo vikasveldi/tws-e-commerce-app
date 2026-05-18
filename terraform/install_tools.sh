@@ -7,14 +7,15 @@ echo "========= System Update & Locks ========="
 # Wait for automatic background updates to finish
 while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
 sudo apt-get update -y
+sudo apt-get install -y apt-transport-https gnupg curl wget unzip software-properties-common
 
 echo "========= Jenkins Setup ========="
-sudo apt-get install openjdk-21-jdk -y
+sudo apt-get install -y openjdk-21-jdk
 sudo mkdir -p /etc/apt/keyrings
 sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
 echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
 sudo apt-get update -y
-sudo apt-get install jenkins -y
+sudo apt-get install -y jenkins
 sudo systemctl enable jenkins
 sudo systemctl start jenkins
 
@@ -27,7 +28,6 @@ sudo systemctl restart docker
 sudo systemctl restart jenkins
 
 echo "========= AWS CLI ========="
-sudo apt-get install unzip -y
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -q awscliv2.zip
 sudo ./aws/install
@@ -38,19 +38,49 @@ curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stabl
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 rm kubectl
 
-echo "========= Trivy ========="
-# Installed via official apt repo to automatically handle dependencies
-sudo apt-get install wget apt-transport-https gnupg lsb-release -y
-wget -qO - https://github.io | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
-echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://github.io $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-sudo apt-get update -y
-sudo apt-get install trivy -y
+echo "========= Trivy Setup ========="
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | \
+gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
 
-echo "========= Helm ========="
-curl https://baltocdn.com | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-sudo apt-get install apt-transport-https --yes
-echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | \
+sudo tee /etc/apt/sources.list.d/trivy.list
+
 sudo apt-get update -y
-sudo apt-get install helm -y
+sudo apt-get install -y trivy
+
+echo "========= Helm Setup ========="
+curl https://baltocdn.com/helm/signing.asc | \
+gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | \
+sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+sudo apt-get update -y
+sudo apt-get install -y helm
+
+echo "========= Installed Versions ========="
+echo "Java Version:"
+java -version
+
+echo "Jenkins Version:"
+jenkins --version || true
+
+echo "Docker Version:"
+docker --version
+
+echo "AWS CLI Version:"
+aws --version
+
+echo "Kubectl Version:"
+kubectl version --client
+
+echo "Trivy Version:"
+trivy --version
+
+echo "Helm Version:"
+helm version
 
 echo "========= Setup Complete ========="
+
+echo "Jenkins Initial Admin Password:"
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword || true
