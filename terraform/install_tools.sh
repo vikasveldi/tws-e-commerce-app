@@ -1,44 +1,56 @@
 #!/bin/bash
 
-# Update system and install core packages
-sudo apt update
-sudo apt install -y fontconfig openjdk-17-jre 
+# Prevent interactive prompts during installation
+export DEBIAN_FRONTEND=noninteractive
 
-# Jenkins installation
-sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
-  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
-  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
-  /etc/apt/sources.list.d/jenkins.list > /dev/null
-sudo apt-get update
-sudo apt-get -y install jenkins
+echo "========= System Update & Locks ========="
+# Wait for automatic background updates to finish
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
+sudo apt-get update -y
 
-sudo systemctl start jenkins
+echo "========= Jenkins Setup ========="
+sudo apt-get install openjdk-21-jdk -y
+sudo mkdir -p /etc/apt/keyrings
+sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update -y
+sudo apt-get install jenkins -y
 sudo systemctl enable jenkins
+sudo systemctl start jenkins
 
-# Docker installation
-sudo apt-get update
-sudo apt-get install docker.io -y
-
-# User group permission
-sudo usermod -aG docker $USER
+echo "========= Docker Setup ========="
+curl -fsSL https://get.docker.com -o install-docker.sh
+sudo sh install-docker.sh
+sudo usermod -aG docker ubuntu
 sudo usermod -aG docker jenkins
-
 sudo systemctl restart docker
 sudo systemctl restart jenkins
 
-# Install dependencies and Trivy
-sudo apt-get install wget apt-transport-https gnupg lsb-release snapd -y
-wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+echo "========= AWS CLI ========="
+sudo apt-get install unzip -y
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -q awscliv2.zip
+sudo ./aws/install
+rm -rf awscliv2.zip aws/
+
+echo "========= Kubectl ========="
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+rm kubectl
+
+echo "========= Trivy ========="
+# Installed via official apt repo to automatically handle dependencies
+sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+wget -qO - https://github.io | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://github.io $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
 sudo apt-get update -y
 sudo apt-get install trivy -y
 
-# AWS CLI installation
-sudo snap install aws-cli --classic
+echo "========= Helm ========="
+curl https://baltocdn.com | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update -y
+sudo apt-get install helm -y
 
-# Helm installation
-sudo snap install helm --classic
-
-# Kubectl installation
-sudo snap install kubectl --classic
+echo "========= Setup Complete ========="
