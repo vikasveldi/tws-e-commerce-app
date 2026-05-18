@@ -33,6 +33,17 @@ module "eks" {
   }
 
 
+  node_security_group_additional_rules = {
+    allow_nodeport_from_internet = {
+      description = "Allow NodePort service traffic"
+      protocol    = "tcp"
+      from_port   = 30000
+      to_port     = 32767
+      type        = "ingress"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
+
   eks_managed_node_groups = {
 
     tws-demo-ng = {
