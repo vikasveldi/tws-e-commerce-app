@@ -6,6 +6,21 @@ module "eks" {
   cluster_name                   = local.name
   cluster_endpoint_public_access = true
 
+   access_entries = {
+    tws_mega_project_iam = {
+      principal_arn = "arn:aws:iam::049419513053:user/tws-mega-project-iam"
+
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+  }
+
   cluster_addons = {
     coredns = {
       most_recent = true
