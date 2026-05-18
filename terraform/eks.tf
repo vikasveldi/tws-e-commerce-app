@@ -82,3 +82,13 @@ data "aws_instances" "eks_nodes" {
 
   depends_on = [module.eks]
 }
+
+resource "aws_security_group_rule" "allow_nodeport_to_eks_nodes" {
+  description       = "Allow NodePort service traffic to EKS worker nodes"
+  type              = "ingress"
+  from_port         = 30000
+  to_port           = 32767
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = module.eks.cluster_primary_security_group_id
+}
